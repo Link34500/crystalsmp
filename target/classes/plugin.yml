@@ -1,0 +1,5 @@
+name: CrystalSMPItems
+version: 1.0
+main: fun.crystalsmp.crystalitems.Main
+api-version: "1.21"
+depend: [ItemsAdder]
