@@ -1,5 +1,6 @@
 package fun.crystalsmp.crystalitems.items;
 
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -15,20 +16,19 @@ import org.bukkit.util.Vector;
 public class SpiderCrystal extends CustomItem {
 
     public SpiderCrystal() {
-        super("spider_crystal", 100);
+        super("spider_crystal", 0);
     }
 
     @Override
     public void applyPassive(Player player) {
-        player.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, 300, 0, false, false, false));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, 600, 0, false, false, false));
     }
 
     @Override
     public void onRightClick(PlayerInteractEvent event) {
         Player player = event.getPlayer();
         if (isCooldownItem(player)) return;
-
-        event.setCancelled(true);
+        
         boolean found = false;
 
         // On boucle sur les entités proches
@@ -55,9 +55,7 @@ public class SpiderCrystal extends CustomItem {
     }
 
     public void handleWallClimbing(Player player) {
-        if (!player.isSneaking()) return;
-
-        // Calcul de la direction face au joueur
+        if (!player.isSneaking() || player.getGameMode() != GameMode.SURVIVAL) return;       // Calcul de la direction face au joueur
         float yaw = player.getLocation().getYaw();
         if (yaw < 0) yaw += 360;
         yaw %= 360;

@@ -34,21 +34,21 @@ public abstract class CustomItem {
 
         if (cooldowns.containsKey(uuid)) {
             long expiration = cooldowns.get(uuid);
+            
             if (now < expiration) {
-                // Calcul du temps restant en secondes
+                // Calcul du temps restant (arrondi au supérieur pour plus de clarté)
                 long timeLeft = (expiration - now) / 1000;
-                // Si le temps est inférieur à 1s mais pas encore expiré, on affiche au moins 1s
-                if (timeLeft == 0) timeLeft = 1;
+                if (timeLeft <= 0) timeLeft = 1;
 
-                // Envoi du message en rouge et en anglais
                 player.sendMessage("§cYou must wait " + timeLeft + " more seconds to use this item again.");
-                return true; 
+                return true; // Bloqué : le cooldown est encore actif
             }
         }
 
-        // Si prêt, on enregistre le nouveau cooldown
+        // Si on arrive ici, soit c'est la 1ère fois, soit le cooldown est passé.
+        // On enregistre le nouveau cooldown et on retourne FALSE (non bloqué).
         cooldowns.put(uuid, now + (cooldownSeconds * 1000L));
-        return true;
+        return false; 
     }
 
     // --- Méthodes à surcharger ---

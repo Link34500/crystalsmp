@@ -3,6 +3,8 @@ package fun.crystalsmp.crystalitems;
 import org.bukkit.plugin.java.JavaPlugin;
 import fun.crystalsmp.crystalitems.events.ItemDispatcher;
 import fun.crystalsmp.crystalitems.items.AgilityCrystal;
+import fun.crystalsmp.crystalitems.items.ChaosCrystal;
+import fun.crystalsmp.crystalitems.items.SpiderCrystal;
 import fun.crystalsmp.crystalitems.items.ToxinCrystal;
 import fun.crystalsmp.crystalitems.managers.ItemManager;
 
@@ -18,6 +20,8 @@ public class Main extends JavaPlugin {
         // Tu peux en ajouter autant que tu veux ici
         itemManager.registerItem(new AgilityCrystal());
         itemManager.registerItem(new ToxinCrystal());
+        itemManager.registerItem(new SpiderCrystal());
+        itemManager.registerItem(new ChaosCrystal());
 
         // 3. Initialisation du Dispatcher
         // On lui passe le manager et l'instance du plugin (pour les tâches/schedulers)
