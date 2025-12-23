@@ -1,29 +1,26 @@
 package fun.crystalsmp.crystalitems.items;
 
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
-import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
-import org.bukkit.util.Transformation;
-import org.joml.Vector3f;
 
 import java.util.HashMap;
 import java.util.UUID;
 
 public class MorphCrystal extends CustomItem {
 
-    private final HashMap<UUID, BlockDisplay> activeMorphs = new HashMap<>();
+    private final HashMap<UUID, FallingBlock> activeMorphs = new HashMap<>();
     private final HashMap<UUID, Location> startLocations = new HashMap<>();
 
     public MorphCrystal() {
-        super("morph_crystal", 60);
+        super("morph_crystal", 0);
     }
 
     @Override
@@ -37,66 +34,50 @@ public class MorphCrystal extends CustomItem {
             removeMorph(player);
             player.sendMessage("§aYou returned to your human form.");
         } else {
-            // 1. Détection du bloc regardé
             Block target = player.getTargetBlockExact(5);
-            if (target == null || target.getType().isAir()) {
-                player.sendMessage("§cLook at a block to morph!");
-                return;
-            }
+            if (target == null || target.getType().isAir()) return;
 
-            // 2. Position parfaitement centrée sur la grille
-            Location gridLoc = player.getLocation().getBlock().getLocation();
-            startLocations.put(uuid, gridLoc.clone());
+            // --- FIX CENTRAGE PARFAIT ---
+            // On prend le centre exact du bloc où se trouve le joueur
+            Location gridLoc = player.getLocation().getBlock().getLocation().add(0.5, 0, 0.5);
+            startLocations.put(uuid, player.getLocation().getBlock().getLocation());
 
-            // 3. Création du BlockDisplay
-            BlockDisplay display = (BlockDisplay) player.getWorld().spawnEntity(gridLoc, EntityType.BLOCK_DISPLAY);
+            // --- FIX BIOME (FallingBlock) ---
+            // Un FallingBlock est considéré comme un vrai bloc et prend la couleur du biome !
+            FallingBlock fallingBlock = player.getWorld().spawnFallingBlock(gridLoc, target.getBlockData());
             
-            // On copie le BlockData exact (inclut l'orientation des coffres, dalles, etc.)
-            display.setBlock(target.getBlockData());
-
-            // --- FIX : CENTRAGE ET ALIGNEMENT ---
-            // On centre le bloc pour qu'il ne dépasse pas
-            Transformation transformation = display.getTransformation();
-            // Translation de 0 car le spawnEntity est déjà sur le coin du bloc, 
-            // le BlockDisplay s'aligne naturellement sur la grille de 1x1x1
-            display.setTransformation(transformation);
-
-            // 4. Rotation Cardinale (Horizontale uniquement)
-            float yaw = getCardinalYaw(player.getFacing());
-            display.setRotation(yaw, 0);
-
-            // 5. Gestion spécifique pour le biome (Coloration)
-            // On force le calcul du biome pour les blocs de type GRASS, LEAVES, etc.
-            display.setBrightness(new BlockDisplay.Brightness(15, 15)); 
+            // On empêche le bloc de tomber et de disparaître
+            fallingBlock.setGravity(false);
+            fallingBlock.setInvulnerable(true);
+            fallingBlock.setDropItem(false);
+            fallingBlock.setTicksLived(1); 
+            
+            // Note: Les FallingBlocks ne tournent pas facilement vers N/S/E/W, 
+            // mais ils sont 100% alignés sur la grille et ont la bonne couleur.
 
             player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 100000, 1, false, false));
-            activeMorphs.put(uuid, display);
+            activeMorphs.put(uuid, fallingBlock);
 
-            player.playSound(player.getLocation(), Sound.ENTITY_ZOMBIE_VILLAGER_CONVERTED, 1f, 1.2f);
-            player.sendMessage("§dMorphed into §f" + target.getType().name().replace("_", " ") + "§d!");
+            player.playSound(player.getLocation(), Sound.BLOCK_CHEST_OPEN, 1f, 1.2f);
+            player.sendMessage("§dMorphed into §f" + target.getType().name() + "§d!");
         }
-    }
-
-    private float getCardinalYaw(BlockFace face) {
-        return switch (face) {
-            case NORTH -> 180;
-            case SOUTH -> 0;
-            case WEST -> 90;
-            case EAST -> -90;
-            default -> 0;
-        };
     }
 
     public void checkMovement(Player player) {
         UUID uuid = player.getUniqueId();
         if (!activeMorphs.containsKey(uuid)) return;
 
-        Location currentLoc = player.getLocation().getBlock().getLocation();
-        Location startLoc = startLocations.get(uuid);
+        Location current = player.getLocation().getBlock().getLocation();
+        Location start = startLocations.get(uuid);
 
-        if (currentLoc.getBlockX() != startLoc.getBlockX() || currentLoc.getBlockZ() != startLoc.getBlockZ()) {
+        // Si le joueur quitte son bloc de 1x1
+        if (current.getBlockX() != start.getBlockX() || current.getBlockZ() != start.getBlockZ()) {
             removeMorph(player);
-            player.sendMessage("§cMorph broken! You moved.");
+            player.sendMessage("§cDisguise broken!");
+        } else {
+            // Empêcher le FallingBlock de despawn (il despawn après 30s normalement)
+            FallingBlock fb = activeMorphs.get(uuid);
+            if (fb != null) fb.setTicksLived(1);
         }
     }
 
