@@ -1,6 +1,7 @@
 package fun.crystalsmp.crystalitems.events;
 
 import fun.crystalsmp.crystalitems.items.AgilityCrystal;
+import fun.crystalsmp.crystalitems.items.MorphCrystal;
 import fun.crystalsmp.crystalitems.items.SpiderCrystal;
 import fun.crystalsmp.crystalitems.managers.ItemManager;
 import org.bukkit.Bukkit;
@@ -9,8 +10,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -21,12 +24,11 @@ public class ItemDispatcher implements Listener {
     public ItemDispatcher(ItemManager manager, JavaPlugin plugin) {
         this.manager = manager;
 
-        // Scan des passifs + mise à jour visuelle (brillance)
         Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             for (Player player : Bukkit.getOnlinePlayers()) {
                 scanForPassives(player);
             }
-        }, 0L, 10L); // Toutes les 0.5s pour plus de réactivité
+        }, 0L, 10L);
     }
 
     @EventHandler
@@ -41,12 +43,10 @@ public class ItemDispatcher implements Listener {
         });
     }
 
-    @EventHandler(priority = EventPriority.LOWEST )
+    @EventHandler(priority = EventPriority.LOWEST)
     public void onToggleFlight(PlayerToggleFlightEvent event) {
         Player player = event.getPlayer();
-        
         if (player.getGameMode() == GameMode.CREATIVE || player.getGameMode() == GameMode.SPECTATOR) return;
-        
         
         for (ItemStack is : player.getInventory().getContents()) {
             if (is == null) continue;
@@ -62,50 +62,56 @@ public class ItemDispatcher implements Listener {
     @EventHandler
     public void onMove(PlayerMoveEvent event) {
         Player player = event.getPlayer();
-        
-        // --- 1. SÉCURITÉ GAME MODE ---
-        // Si le joueur est en créatif ou spectateur, on ne touche à rien pour ne pas casser le vol vanilla
-        if (player.getGameMode() == GameMode.CREATIVE || player.getGameMode() == GameMode.SPECTATOR) {
-            return;
+        if (player.getGameMode() == GameMode.CREATIVE || player.getGameMode() == GameMode.SPECTATOR) return;
+
+        // On parcourt l'inventaire pour gérer les cristaux passifs ou actifs (Agility et Morph)
+        for (ItemStack is : player.getInventory().getContents()) {
+            if (is == null) continue;
+
+            manager.getCustomItemByItemStack(is).ifPresent(customItem -> {
+                
+                // 1. GESTION AGILITY (Reset au sol)
+                if (customItem instanceof AgilityCrystal && ((org.bukkit.entity.Entity) player).isOnGround()) {
+                    if (!player.getAllowFlight()) player.setAllowFlight(true);
+                }
+
+                // 2. GESTION MORPH (Démorph si le joueur quitte son bloc)
+                if (customItem instanceof MorphCrystal morph) {
+                    morph.checkMovement(player);
+                }
+            });
         }
 
-        // --- 2. GESTION DU DOUBLE SAUT (Reset au sol) ---
-        // On vérifie si le joueur est au sol pour lui redonner son saut
-        if (((org.bukkit.entity.Entity) player).isOnGround()) {
-            boolean hasAgility = false;
-            
-            // Scan rapide pour voir s'il a le cristal d'Agilité
-            for (ItemStack is : player.getInventory().getContents()) {
-                if (is != null && manager.getCustomItemByItemStack(is).orElse(null) instanceof AgilityCrystal) {
-                    hasAgility = true;
-                    break;
-                }
+        // 3. GESTION SPIDER (Main en main)
+        ItemStack hand = player.getInventory().getItemInMainHand();
+        manager.getCustomItemByItemStack(hand).ifPresent(customItem -> {
+            if (customItem instanceof SpiderCrystal spider) {
+                spider.handleWallClimbing(player);
             }
+        });
+    }
 
-            // CORRECTIF : On force le setAllowFlight à true seulement si nécessaire
-            // Cela réactive le cristal même après être sorti du mode Créatif
-            if (hasAgility) {
-                if (!player.getAllowFlight()) {
-                    player.setAllowFlight(true);
-                }
-            } else {
-                // Si le joueur n'a plus le cristal, on lui retire le droit de voler
-                if (player.getAllowFlight()) {
-                    player.setAllowFlight(false);
-                    player.setFlying(false);
-                }
-            }
-        }
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        handleCleanup(event.getPlayer());
+    }
 
-    // --- 3. GESTION SPIDER (Grimpe) ---
-    ItemStack hand = player.getInventory().getItemInMainHand();
-    manager.getCustomItemByItemStack(hand).ifPresent(customItem -> {
-        if (customItem instanceof SpiderCrystal spider) {
-            spider.handleWallClimbing(player);
+    @EventHandler
+    public void onDeath(PlayerDeathEvent event) {
+        handleCleanup(event.getEntity());
+    }
+
+    private void handleCleanup(Player player) {
+        for (ItemStack is : player.getInventory().getContents()) {
+            if (is == null) continue;
+            manager.getCustomItemByItemStack(is).ifPresent(customItem -> {
+                if (customItem instanceof MorphCrystal morph) {
+                    morph.removeMorph(player);
+                }
+            });
         }
-    });
-}
-    
+    }
+
     private void scanForPassives(Player player) {
         for (ItemStack is : player.getInventory().getContents()) {
             if (is == null) continue;

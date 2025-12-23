@@ -5,6 +5,7 @@ import fun.crystalsmp.crystalitems.events.ItemDispatcher;
 import fun.crystalsmp.crystalitems.items.AgilityCrystal;
 import fun.crystalsmp.crystalitems.items.ChaosCrystal;
 import fun.crystalsmp.crystalitems.items.FlashbangCrystal;
+import fun.crystalsmp.crystalitems.items.MorphCrystal;
 import fun.crystalsmp.crystalitems.items.SpiderCrystal;
 import fun.crystalsmp.crystalitems.items.ToxinCrystal;
 import fun.crystalsmp.crystalitems.managers.ItemManager;
@@ -35,6 +36,7 @@ public class Main extends JavaPlugin {
         itemManager.registerItem(new SpiderCrystal());
         itemManager.registerItem(new ChaosCrystal());
         itemManager.registerItem(new FlashbangCrystal(this));
+        itemManager.registerItem(new MorphCrystal());
 
         // Initialisation du système de coffre
         this.chestManager = new CrystalChestManager(this, itemManager);
