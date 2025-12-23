@@ -16,6 +16,11 @@ public class ItemManager {
     items.put(item.getItemAdderId(), item);
   }
 
+  // Ajoute ça dans ton ItemManager.java
+  public Map<String, CustomItem> getItems() {
+    return items;
+  }
+  
   public Optional<CustomItem> getCustomItemByItemStack(ItemStack item) {
     CustomStack customItem = CustomStack.byItemStack(item);
     if (customItem == null) return Optional.empty();
