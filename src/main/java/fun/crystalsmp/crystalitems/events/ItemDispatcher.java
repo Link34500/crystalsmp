@@ -9,9 +9,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.BlockBreakEvent;
-import org.bukkit.event.block.BlockPlaceEvent;
-import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.*;
@@ -23,144 +20,70 @@ public class ItemDispatcher implements Listener {
 
     public ItemDispatcher(ItemManager manager, JavaPlugin plugin) {
         this.manager = manager;
-
         Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                scanForPassives(player);
-            }
+            for (Player player : Bukkit.getOnlinePlayers()) scanForPassives(player);
         }, 0L, 10L);
     }
 
-    // --- LOGIQUE DE VÉRIFICATION SOUL CRYSTAL ---
-    
     private boolean isSoulVictim(Player player) {
-        for (CustomItem item : manager.getItems().values()) {
-            if (item instanceof SoulCrystal soul && soul.isVictim(player.getUniqueId())) return true;
-        }
-        return false;
+        return manager.getItems().values().stream()
+                .anyMatch(i -> i instanceof SoulCrystal soul && soul.isVictim(player.getUniqueId()));
     }
 
     private boolean isSoulCaster(Player player) {
-        for (CustomItem item : manager.getItems().values()) {
-            if (item instanceof SoulCrystal soul && soul.isCaster(player.getUniqueId())) return true;
-        }
-        return false;
+        return manager.getItems().values().stream()
+                .anyMatch(i -> i instanceof SoulCrystal soul && soul.isCaster(player.getUniqueId()));
     }
 
-    // --- ÉVÉNEMENTS DE BLOCAGE ET SÉCURITÉ ---
+    // --- HITBOX & DAMAGE TRANSFER ---
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onDamage(EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof Player player)) return;
+
+        // Si on tape le lanceur, on transfère à la victime
+        if (isSoulCaster(player)) {
+            event.setCancelled(true); // Le lanceur ne prend rien
+            
+            for (CustomItem item : manager.getItems().values()) {
+                if (item instanceof SoulCrystal soul) {
+                    UUID victimUUID = soul.getVictimByCaster(player.getUniqueId());
+                    if (victimUUID != null) {
+                        Player victim = Bukkit.getPlayer(victimUUID);
+                        if (victim != null) {
+                            victim.damage(event.getDamage());
+                            victim.playHurtAnimation(0); // Effet visuel
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInteract(PlayerInteractEvent event) {
-        Player player = event.getPlayer();
-        
-        // Bloquer uniquement la VICTIME. Le CASTER peut interagir/poser des blocs.
-        if (isSoulVictim(player)) {
+        if (isSoulVictim(event.getPlayer())) {
             event.setCancelled(true);
             return;
         }
-
         ItemStack item = event.getItem();
         if (item == null) return;
-
-        manager.getCustomItemByItemStack(item).ifPresent(customItem -> {
-            if (event.getAction().name().contains("RIGHT")) {
-                customItem.onRightClick(event);
-            }
+        manager.getCustomItemByItemStack(item).ifPresent(ci -> {
+            if (event.getAction().name().contains("RIGHT")) ci.onRightClick(event);
         });
     }
-
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void onDamage(EntityDamageEvent event) {
-        if (event.getEntity() instanceof Player player) {
-            // GOD MODE : Le lanceur est invincible pendant la possession
-            if (isSoulCaster(player)) {
-                event.setCancelled(true);
-            }
-        }
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void onAttack(EntityDamageByEntityEvent event) {
-        if (event.getDamager() instanceof Player player) {
-            // Seule la victime est empêchée de frapper
-            if (isSoulVictim(player)) event.setCancelled(true);
-        }
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void onBreak(BlockBreakEvent event) {
-        // Seule la victime ne peut pas casser de blocs
-        if (isSoulVictim(event.getPlayer())) event.setCancelled(true);
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void onPlace(BlockPlaceEvent event) {
-        // Seule la victime ne peut pas poser de blocs
-        if (isSoulVictim(event.getPlayer())) event.setCancelled(true);
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void onDrop(PlayerDropItemEvent event) {
-        // La victime ne peut rien jeter
-        if (isSoulVictim(event.getPlayer())) event.setCancelled(true);
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void onCommand(PlayerCommandPreprocessEvent event) {
-        if (isSoulVictim(event.getPlayer())) {
-            event.setCancelled(true);
-            event.getPlayer().sendMessage("§cVotre âme est possédée...");
-        }
-    }
-
-    // --- LOGIQUE PASSIVE ET MOUVEMENTS ---
 
     @EventHandler
     public void onMove(PlayerMoveEvent event) {
         Player player = event.getPlayer();
-        if (player.getGameMode() == GameMode.CREATIVE || player.getGameMode() == GameMode.SPECTATOR) return;
+        if (player.getGameMode() == GameMode.SPECTATOR) return;
 
-        // On scanne l'inventaire pour les effets passifs (Double Saut, Morph, etc.)
         for (ItemStack is : player.getInventory().getContents()) {
             if (is == null) continue;
-            manager.getCustomItemByItemStack(is).ifPresent(customItem -> {
-                if (customItem instanceof AgilityCrystal && player.isOnGround()) {
-                    if (!player.getAllowFlight()) player.setAllowFlight(true);
-                }
-                if (customItem instanceof MorphCrystal morph) {
-                    morph.checkMovement(player);
-                }
+            manager.getCustomItemByItemStack(is).ifPresent(ci -> {
+                if (ci instanceof AgilityCrystal && player.isOnGround()) player.setAllowFlight(true);
+                if (ci instanceof MorphCrystal morph) morph.checkMovement(player);
             });
         }
-
-        // Spider Crystal (Doit être tenu en main)
-        ItemStack hand = player.getInventory().getItemInMainHand();
-        manager.getCustomItemByItemStack(hand).ifPresent(customItem -> {
-            if (customItem instanceof SpiderCrystal spider) {
-                spider.handleWallClimbing(player);
-            }
-        });
-    }
-
-    @EventHandler(priority = EventPriority.LOWEST)
-    public void onToggleFlight(PlayerToggleFlightEvent event) {
-        Player player = event.getPlayer();
-        if (player.getGameMode() == GameMode.CREATIVE || player.getGameMode() == GameMode.SPECTATOR) return;
-        
-        for (ItemStack is : player.getInventory().getContents()) {
-            if (is == null) continue;
-            manager.getCustomItemByItemStack(is).ifPresent(customItem -> {
-                if (customItem instanceof AgilityCrystal agility) {
-                    agility.onDoubleJump(event);
-                }
-            });
-            if (event.isCancelled()) return;
-        }
-    }
-
-    @EventHandler
-    public void onQuit(PlayerQuitEvent event) {
-        handleCleanup(event.getPlayer());
     }
 
     @EventHandler
@@ -171,10 +94,8 @@ public class ItemDispatcher implements Listener {
     private void handleCleanup(Player player) {
         for (ItemStack is : player.getInventory().getContents()) {
             if (is == null) continue;
-            manager.getCustomItemByItemStack(is).ifPresent(customItem -> {
-                if (customItem instanceof MorphCrystal morph) {
-                    morph.removeMorph(player);
-                }
+            manager.getCustomItemByItemStack(is).ifPresent(ci -> {
+                if (ci instanceof MorphCrystal morph) morph.removeMorph(player);
             });
         }
     }
@@ -182,9 +103,7 @@ public class ItemDispatcher implements Listener {
     private void scanForPassives(Player player) {
         for (ItemStack is : player.getInventory().getContents()) {
             if (is == null) continue;
-            manager.getCustomItemByItemStack(is).ifPresent(customItem -> {
-                customItem.applyPassive(player);
-            });
+            manager.getCustomItemByItemStack(is).ifPresent(ci -> ci.applyPassive(player));
         }
     }
 }
