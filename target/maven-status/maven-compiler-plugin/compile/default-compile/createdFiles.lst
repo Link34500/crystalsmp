@@ -1,8 +1,11 @@
 fun\crystalsmp\crystalitems\items\CustomItem.class
 fun\crystalsmp\crystalitems\items\ToxinCrystal.class
+fun\crystalsmp\crystalitems\items\FlashbangCrystal.class
 fun\crystalsmp\crystalitems\events\ItemDispatcher.class
+fun\crystalsmp\crystalitems\hooks\CrystalExpansion.class
 fun\crystalsmp\crystalitems\items\SpiderCrystal.class
 fun\crystalsmp\crystalitems\managers\ItemManager.class
 fun\crystalsmp\crystalitems\items\AgilityCrystal.class
 fun\crystalsmp\crystalitems\items\ChaosCrystal.class
+fun\crystalsmp\crystalitems\managers\CrystalChestManager.class
 fun\crystalsmp\crystalitems\Main.class

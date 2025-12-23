@@ -12,7 +12,7 @@ public class ToxinCrystal extends CustomItem {
 
     public ToxinCrystal() {
         // Cooldown de 50 secondes
-        super("toxin_crystal", 0);
+        super("toxin_crystal", 60);
     }
 
     @Override

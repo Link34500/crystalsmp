@@ -16,7 +16,7 @@ import org.bukkit.util.Vector;
 public class SpiderCrystal extends CustomItem {
 
     public SpiderCrystal() {
-        super("spider_crystal", 0);
+        super("spider_crystal", 30);
     }
 
     @Override

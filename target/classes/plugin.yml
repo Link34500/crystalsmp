@@ -1,5 +1,9 @@
 name: CrystalSMPItems
 version: 1.0
 main: fun.crystalsmp.crystalitems.Main
-api-version: "1.21"
-depend: [ItemsAdder]
+api-version: 1.21
+depend: [ItemsAdder, PlaceholderAPI] # Très important
+commands:
+  crystalspawn:
+    description: Force le spawn d'un coffre de cristal.
+    permission: crystalsmp.admin

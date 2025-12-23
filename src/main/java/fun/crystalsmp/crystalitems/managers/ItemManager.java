@@ -22,4 +22,8 @@ public class ItemManager {
 
     return Optional.ofNullable(items.get(customItem.getNamespacedID()));
   }
+  public CustomItem getRandomItem() {
+    Object[] values = items.values().toArray();
+    return (CustomItem) values[new java.util.Random().nextInt(values.length)];
+}
 }
