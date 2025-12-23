@@ -1,8 +1,10 @@
 fun\crystalsmp\crystalitems\items\FlashbangCrystal.class
 fun\crystalsmp\crystalitems\events\ItemDispatcher.class
+fun\crystalsmp\crystalitems\items\SoulCrystal$1.class
 fun\crystalsmp\crystalitems\items\ChaosCrystal.class
 fun\crystalsmp\crystalitems\Main.class
 fun\crystalsmp\crystalitems\items\PhoenixCrystal.class
+fun\crystalsmp\crystalitems\items\SoulCrystal.class
 fun\crystalsmp\crystalitems\items\CustomItem.class
 fun\crystalsmp\crystalitems\items\ToxinCrystal.class
 fun\crystalsmp\crystalitems\hooks\CrystalExpansion.class
