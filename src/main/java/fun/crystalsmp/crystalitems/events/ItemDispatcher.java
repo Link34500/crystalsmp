@@ -10,7 +10,6 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
-import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.*;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -35,15 +34,12 @@ public class ItemDispatcher implements Listener {
                 .anyMatch(i -> i instanceof SoulCrystal soul && soul.isCaster(player.getUniqueId()));
     }
 
-    // --- HITBOX & DAMAGE TRANSFER ---
+    // --- TRANSFERT DE DÉGÂTS (HITBOX) ---
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onDamage(EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
-
-        // Si on tape le lanceur, on transfère à la victime
         if (isSoulCaster(player)) {
-            event.setCancelled(true); // Le lanceur ne prend rien
-            
+            event.setCancelled(true);
             for (CustomItem item : manager.getItems().values()) {
                 if (item instanceof SoulCrystal soul) {
                     UUID victimUUID = soul.getVictimByCaster(player.getUniqueId());
@@ -51,7 +47,7 @@ public class ItemDispatcher implements Listener {
                         Player victim = Bukkit.getPlayer(victimUUID);
                         if (victim != null) {
                             victim.damage(event.getDamage());
-                            victim.playHurtAnimation(0); // Effet visuel
+                            victim.playHurtAnimation(0);
                         }
                     }
                 }
@@ -75,28 +71,50 @@ public class ItemDispatcher implements Listener {
     @EventHandler
     public void onMove(PlayerMoveEvent event) {
         Player player = event.getPlayer();
-        if (player.getGameMode() == GameMode.SPECTATOR) return;
+        if (player.getGameMode() == GameMode.CREATIVE || player.getGameMode() == GameMode.SPECTATOR) return;
+
+        boolean hasAgility = false;
 
         for (ItemStack is : player.getInventory().getContents()) {
             if (is == null) continue;
-            manager.getCustomItemByItemStack(is).ifPresent(ci -> {
-                if (ci instanceof AgilityCrystal && player.isOnGround()) player.setAllowFlight(true);
-                if (ci instanceof MorphCrystal morph) morph.checkMovement(player);
-            });
+            CustomItem ci = manager.getCustomItemByItemStack(is).orElse(null);
+            
+            if (ci instanceof AgilityCrystal) hasAgility = true; // On détecte la pierre
+            if (ci instanceof MorphCrystal morph) morph.checkMovement(player);
         }
+
+        // --- GESTION DU DOUBLE SAUT ---
+        if (hasAgility) {
+            // Si le joueur est au sol, on lui redonne l'autorisation de double-cliquer sur ESPACE
+            if (player.isOnGround()) {
+                player.setAllowFlight(true);
+            }
+        } else {
+            // Sécurité : si on lâche l'item, on perd le droit de voler
+            if (player.getAllowFlight()) {
+                player.setAllowFlight(false);
+                player.setFlying(false);
+            }
+        }
+
+        // Spider Crystal
+        ItemStack hand = player.getInventory().getItemInMainHand();
+        manager.getCustomItemByItemStack(hand).ifPresent(ci -> {
+            if (ci instanceof SpiderCrystal spider) spider.handleWallClimbing(player);
+        });
     }
 
-    @EventHandler
-    public void onDeath(PlayerDeathEvent event) {
-        handleCleanup(event.getEntity());
-    }
-
-    private void handleCleanup(Player player) {
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onToggleFlight(PlayerToggleFlightEvent event) {
+        Player player = event.getPlayer();
+        if (player.getGameMode() == GameMode.CREATIVE || player.getGameMode() == GameMode.SPECTATOR) return;
+        
         for (ItemStack is : player.getInventory().getContents()) {
             if (is == null) continue;
             manager.getCustomItemByItemStack(is).ifPresent(ci -> {
-                if (ci instanceof MorphCrystal morph) morph.removeMorph(player);
+                if (ci instanceof AgilityCrystal agility) agility.onDoubleJump(event);
             });
+            if (event.isCancelled()) return;
         }
     }
 
